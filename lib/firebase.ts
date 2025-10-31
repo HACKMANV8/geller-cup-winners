@@ -1,5 +1,9 @@
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { 
+  getAuth, 
+  setPersistence, 
+  browserLocalPersistence
+} from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -10,6 +14,24 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase only if it hasn't been initialized yet
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-export const auth = getAuth(app);
+// Initialize Firebase
+let app;
+let auth;
+
+if (typeof window !== 'undefined') {
+  // Only run in browser environment
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+  
+  // Set persistence
+  setPersistence(auth, browserLocalPersistence)
+    .catch((error) => {
+      console.error('Error setting auth persistence:', error);
+    });
+} else {
+  // For server-side rendering
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+}
+
+export { auth, app };

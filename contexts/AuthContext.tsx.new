@@ -22,9 +22,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>; // Alias for login
   register: (email: string, password: string, displayName: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<void>; // Alias for register
   logout: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
 };
@@ -35,11 +33,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Handle auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const token = await firebaseUser.getIdToken();
         localStorage.setItem('authToken', token);
+        
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -55,68 +55,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  // Login with email and password
   const login = async (email: string, password: string) => {
     try {
       setLoading(true);
-      // Basic validation
-      if (!email || !password) {
-        throw new Error('Email and password are required');
-      }
-      
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      return userCredential.user;
-    } catch (error: any) {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error) {
       console.error('Error signing in:', error);
-      
-      // Handle specific Firebase auth errors
-      let errorMessage = 'Failed to sign in';
-      
-      switch (error.code) {
-        case 'auth/user-not-found':
-          errorMessage = 'No account found with this email address';
-          break;
-        case 'auth/wrong-password':
-          errorMessage = 'Incorrect password. Please try again';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Please enter a valid email address';
-          break;
-        case 'auth/user-disabled':
-          errorMessage = 'This account has been disabled';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = 'Too many failed attempts. Please try again later';
-          break;
-        default:
-          errorMessage = error.message || 'An error occurred during sign in';
-      }
-      
-      throw new Error(errorMessage);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
+  // Register new user with email and password
   const register = async (email: string, password: string, displayName: string) => {
     try {
       setLoading(true);
+      
+      // Create user with email and password
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Update user profile with display name
       if (auth.currentUser) {
         await updateProfile(auth.currentUser, {
           displayName: displayName
         });
-        const userDocRef = doc(db, 'users', userCredential.user.uid);
-        await setDoc(userDocRef, {
-          email: userCredential.user.email,
-          displayName: displayName,
-          createdAt: new Date().toISOString(),
-        });
-        setUser({
-          uid: userCredential.user.uid,
-          email: userCredential.user.email,
-          displayName: displayName,
-        });
       }
+      
+      // Store additional user data in Firestore
+      const userDocRef = doc(db, 'users', userCredential.user.uid);
+      await setDoc(userDocRef, {
+        email: userCredential.user.email,
+        displayName: displayName,
+        createdAt: new Date().toISOString(),
+      });
+      
+      // Update local state
+      setUser({
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        displayName: displayName,
+      });
     } catch (error) {
       console.error('Error creating account:', error);
       throw error;
@@ -125,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Logout the current user
   const logout = async () => {
     try {
       setLoading(true);
@@ -137,18 +118,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Get the current user's ID token
   const getIdToken = async (): Promise<string | null> => {
     if (!auth.currentUser) return null;
     return await auth.currentUser.getIdToken();
   };
 
+  // Context value
   const value = {
     user,
     loading,
     login,
-    signIn: login, // Alias for login
     register,
-    signUp: register, // Alias for register
     logout,
     getIdToken,
   };
@@ -160,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Custom hook to use the auth context
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

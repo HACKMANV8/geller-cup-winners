@@ -18,7 +18,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
-  const { user, loading: authLoading, logout, getIdToken } = useAuth();
+  const auth = useAuth();
+  const { user, loading: authLoading, logout, getIdToken } = auth;
   const router = useRouter();
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
