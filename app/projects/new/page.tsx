@@ -218,9 +218,7 @@ export default function NewProjectPage() {
                         : "border-neutral-800 hover:border-neutral-700"
                     }`}
                   >
-                    <div className="font-medium text-gray-200">
-                      {lang.name}
-                    </div>
+                    <div className="font-medium text-gray-200">{lang.name}</div>
                   </button>
                 ))}
               </div>
@@ -233,7 +231,11 @@ export default function NewProjectPage() {
                 </label>
                 <input
                   type={field === "port" ? "number" : "text"}
-                  value={(formData as any)[field]}
+                  value={
+                    (formData as unknown as Record<string, string | number>)[
+                      field
+                    ]
+                  }
                   onChange={(e) =>
                     setFormData({ ...formData, [field]: e.target.value })
                   }
