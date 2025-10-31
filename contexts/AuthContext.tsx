@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -7,9 +8,11 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
-  User as FirebaseUser
+  User as FirebaseUser,
+  GithubAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/client';
 
 type User = {
@@ -21,8 +24,9 @@ type User = {
 type AuthContextType = {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>; // Alias for login
+  login: (email: string, password: string) => Promise<FirebaseUser>;
+  signIn: (email: string, password: string) => Promise<FirebaseUser>; // Alias for login
+  signInWithGitHub: () => Promise<FirebaseUser>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>; // Alias for register
   logout: () => Promise<void>;
@@ -55,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<FirebaseUser> => {
     try {
       setLoading(true);
       // Basic validation
@@ -142,11 +146,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return await auth.currentUser.getIdToken();
   };
 
+  const signInWithGitHub = async (): Promise<FirebaseUser> => {
+    try {
+      setLoading(true);
+      const provider = new GithubAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      
+      // Check if user already exists in Firestore
+      const userDocRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      // If user doesn't exist, create a new user document
+      if (!userDoc.exists()) {
+        await setDoc(userDocRef, {
+          email: result.user.email,
+          displayName: result.user.displayName || result.user.email?.split('@')[0] || 'GitHub User',
+          createdAt: new Date().toISOString(),
+          photoURL: result.user.photoURL || null,
+          provider: 'github'
+        });
+      }
+      
+      return result.user;
+    } catch (error: unknown) {
+      console.error('Error signing in with GitHub:', error);
+      let errorMessage = 'Failed to sign in with GitHub';
+      
+      if (error && typeof error === 'object' && 'code' in error) {
+        const errorCode = error.code as string;
+        if (errorCode === 'auth/account-exists-with-different-credential') {
+          errorMessage = 'An account already exists with the same email but different sign-in credentials.';
+        } else if (errorCode === 'auth/popup-closed-by-user') {
+          errorMessage = 'Sign in was cancelled';
+        } else if (errorCode) {
+          errorMessage = `Error: ${errorCode}`;
+        }
+      }
+      
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
     user,
     loading,
     login,
     signIn: login, // Alias for login
+    signInWithGitHub,
     register,
     signUp: register, // Alias for register
     logout,

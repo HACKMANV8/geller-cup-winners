@@ -11,6 +11,7 @@ export default function Home() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -56,7 +57,10 @@ export default function Home() {
 
     try {
       if (isSignUp) {
-        await signUp(email, password);
+        if (!displayName.trim()) {
+          throw new Error('Display name is required');
+        }
+        await signUp(email, password, displayName);
       } else {
         await signIn(email, password);
       }
@@ -159,6 +163,22 @@ export default function Home() {
                 />
               </div>
             </div>
+
+            {isSignUp && (
+              <div>
+                <label className="block text-sm text-gray-700 mb-1.5 dark:text-gray-200">Display Name</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="w-full appearance-none rounded-lg border border-gray-300/80 bg-white/90 px-4 py-2.5 text-gray-900 shadow-sm outline-none ring-0 transition placeholder:text-gray-400 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 dark:border-gray-700 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-400 dark:focus:border-indigo-500 dark:focus:ring-indigo-900"
+                    placeholder="Your name"
+                    required={isSignUp}
+                  />
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm text-gray-700 mb-1.5 dark:text-gray-200">Password</label>
