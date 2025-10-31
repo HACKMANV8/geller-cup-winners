@@ -17,7 +17,6 @@ import {
   Plus,
   GitBranch,
   Trash2,
-  Loader,
   User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -34,10 +33,20 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router]);
 
-  const { data: projects, isLoading } = useQuery({
+  const {
+    data: projects,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["projects"],
     queryFn: api.getProjects,
     enabled: !!user,
+    // Reduce perceived load time and chatter
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+    placeholderData: [] as Project[],
   });
 
   const deleteMutation = useMutation({
@@ -52,13 +61,7 @@ export default function DashboardPage() {
     router.push("/");
   };
 
-  if (authLoading || isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
-        <Loader className="h-8 w-8 animate-spin text-white" />
-      </div>
-    );
-  }
+  // Avoid blocking the whole page with a full-screen loader. We'll render skeletons instead.
 
   return (
     <div className="flex min-h-screen bg-[#0a0a0a] text-gray-100">
@@ -102,7 +105,34 @@ export default function DashboardPage() {
 
         {/* Main Content */}
         <main className="flex-1 px-8 py-10">
-          {projects && projects.length > 0 ? (
+          {/* Error state */}
+          {error ? (
+            <div className="flex flex-col items-center justify-center text-center mt-20">
+              <div className="text-red-400 mb-2">Failed to load projects.</div>
+              <button
+                onClick={() => refetch()}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-black rounded-md hover:bg-gray-200 transition text-sm"
+              >
+                Retry
+              </button>
+            </div>
+          ) : isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="bg-[#111111] border border-gray-800 rounded-lg p-5 animate-pulse"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="h-5 w-32 bg-gray-800 rounded" />
+                    <div className="h-4 w-4 bg-gray-800 rounded" />
+                  </div>
+                  <div className="h-4 w-48 bg-gray-800 rounded" />
+                  <div className="mt-2 h-3 w-24 bg-gray-900 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : projects && projects.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {projects.map((project) => (
                 <ProjectCard
