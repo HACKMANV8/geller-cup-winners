@@ -1,28 +1,41 @@
-'use client';
+"use client";
 
-import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api';
-import { Project, CreateProjectInput } from '@/types';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Rocket, Plus, GitBranch, Trash2, Loader, LogOut } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import GitHubConnect from '@/components/GitHubConnect';
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
+import { Project, CreateProjectInput } from "@/types";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  Home,
+  Boxes,
+  Rocket,
+  Settings,
+  LogOut,
+  Plus,
+  GitBranch,
+  Trash2,
+  Loader,
+  User,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [showNewProject, setShowNewProject] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/');
+      router.push("/");
     }
   }, [user, authLoading, router]);
 
   const { data: projects, isLoading } = useQuery({
-    queryKey: ['projects'],
+    queryKey: ["projects"],
     queryFn: api.getProjects,
     enabled: !!user,
   });
@@ -30,108 +43,131 @@ export default function DashboardPage() {
   const deleteMutation = useMutation({
     mutationFn: api.deleteProject,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 
   const handleLogout = async () => {
     await logout();
-    router.push('/');
+    router.push("/");
   };
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+        <Loader className="h-8 w-8 animate-spin text-white" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-600 p-2 rounded-lg">
-              <Rocket className="h-6 w-6 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold">MCP Deploy</h1>
+    <div className="flex min-h-screen bg-[#0a0a0a] text-gray-100">
+      {/* Sidebar */}
+      <aside className="w-60 bg-[#111111] border-r border-gray-800 flex flex-col justify-between fixed left-0 top-0 bottom-0">
+        <div>
+          <div className="p-5 flex items-center gap-3 border-b border-gray-800">
+            <Rocket className="h-6 w-6 text-white" />
+            <h1 className="text-lg font-semibold">MCP Deploy</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">{user?.email}</span>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 transition"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
-          </div>
+          <nav className="mt-6 space-y-1">
+            <SidebarItem icon={<Home className="h-4 w-4" />} label="Dashboard" active />
+            <SidebarItem icon={<Boxes className="h-4 w-4" />} label="Projects" />
+            <SidebarItem icon={<Rocket className="h-4 w-4" />} label="Deployments" />
+            <SidebarItem icon={<Settings className="h-4 w-4" />} label="Settings" />
+          </nav>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {/* GitHub Connect Section */}
-        <div className="mb-8">
-          <GitHubConnect />
-        </div>
-
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold">Your Projects</h2>
+        <div className="p-4 border-t border-gray-800">
           <button
-            onClick={() => setShowNewProject(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-gray-400 hover:text-red-500 transition text-sm"
           >
-            <Plus className="h-5 w-5" />
-            New Project
+            <LogOut className="h-4 w-4" />
+            Logout
           </button>
         </div>
+      </aside>
 
-        {projects && projects.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
-              <ProjectCard
-                key={project._id}
-                project={project}
-                onDelete={(id) => deleteMutation.mutate(id)}
-                onClick={() => router.push(`/projects/${project._id}`)}
-              />
-            ))}
+      {/* Main Panel */}
+      <div className="flex-1 ml-60 flex flex-col">
+        {/* Topbar */}
+        <header className="sticky top-0 z-10 backdrop-blur-md bg-[#0a0a0acc] border-b border-gray-800 px-6 py-3 flex justify-between items-center">
+          <h2 className="text-lg font-semibold">Projects</h2>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-[#111111] border border-gray-800 rounded-lg">
+              <User className="h-4 w-4 text-gray-400" />
+              <span className="text-sm text-gray-400">{user?.email}</span>
+            </div>
           </div>
-        ) : (
-          <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-            <Rocket className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No projects yet</h3>
-            <p className="text-gray-600 mb-6">
-              Create your first project to get started with deployments
-            </p>
-            <button
-              onClick={() => router.push('/projects/new')}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-            >
-              <Plus className="h-5 w-5" />
-              Create Project
-            </button>
-          </div>
-        )}
-      </main>
+        </header>
 
-      {/* New Project Modal */}
-      {showNewProject && (
-        <NewProjectModal
-          onClose={() => setShowNewProject(false)}
-          onSuccess={() => {
-            setShowNewProject(false);
-            queryClient.invalidateQueries({ queryKey: ['projects'] });
-          }}
-        />
-      )}
+        {/* Main Content */}
+        <main className="flex-1 px-8 py-10">
+          {projects && projects.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {projects.map((project) => (
+                <ProjectCard
+                  key={project._id}
+                  project={project}
+                  onDelete={(id) => deleteMutation.mutate(id)}
+                  onClick={() => router.push(`/projects/${project._id}`)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-center mt-20">
+              <Rocket className="h-12 w-12 text-gray-600 mb-4" />
+              <h3 className="text-lg font-medium mb-2">No projects found</h3>
+              <p className="text-gray-500 text-sm mb-6">
+                Create your first project to get started with deployments.
+              </p>
+              <button
+                onClick={() => router.push("/projects/new")}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-md hover:bg-gray-200 transition font-medium text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                New Project
+              </button>
+            </div>
+          )}
+        </main>
+
+        {/* Floating New Project Button */}
+        <button
+          onClick={() => router.push("/projects/new")}
+          className="fixed bottom-8 right-8 bg-white text-black hover:bg-gray-200 transition rounded-full shadow-lg p-4"
+        >
+          <Plus className="h-5 w-5" />
+        </button>
+      </div>
     </div>
   );
 }
 
+/* --- Sidebar Item --- */
+function SidebarItem({
+  icon,
+  label,
+  active = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+}) {
+  return (
+    <button
+      className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium transition ${
+        active
+          ? "bg-[#1a1a1a] text-white border-l-2 border-white"
+          : "text-gray-400 hover:text-white hover:bg-[#1a1a1a]"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+/* --- Project Card --- */
 function ProjectCard({
   project,
   onDelete,
@@ -143,7 +179,7 @@ function ProjectCard({
 }) {
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Are you sure you want to delete "${project.name}"?`)) {
+    if (confirm(`Delete project "${project.name}"?`)) {
       onDelete(project._id);
     }
   };
@@ -151,23 +187,25 @@ function ProjectCard({
   return (
     <div
       onClick={onClick}
-      className="bg-white p-6 rounded-lg border border-gray-200 hover:border-blue-500 hover:shadow-lg transition cursor-pointer"
+      className="group relative bg-[#111111] border border-gray-800 rounded-lg p-5 hover:border-gray-600 hover:shadow-[0_0_20px_-10px_rgba(255,255,255,0.1)] transition cursor-pointer"
     >
-      <div className="flex justify-between items-start mb-4">
-        <h3 className="text-xl font-semibold">{project.name}</h3>
+      <div className="flex justify-between items-start mb-3">
+        <h3 className="text-base font-semibold group-hover:text-white transition">
+          {project.name}
+        </h3>
         <button
           onClick={handleDelete}
-          className="text-gray-400 hover:text-red-600 transition"
+          className="text-gray-500 hover:text-red-500 transition"
         >
-          <Trash2 className="h-5 w-5" />
+          <Trash2 className="h-4 w-4" />
         </button>
       </div>
-      <div className="flex items-center gap-2 text-sm text-gray-600">
-        <GitBranch className="h-4 w-4" />
+      <div className="flex items-center gap-2 text-xs text-gray-500">
+        <GitBranch className="h-3.5 w-3.5" />
         <span className="truncate">{project.repoUrl}</span>
       </div>
       {project.branch && (
-        <div className="mt-2 text-sm text-gray-500">
+        <div className="mt-1 text-xs text-gray-600">
           Branch: {project.branch}
         </div>
       )}
@@ -175,6 +213,7 @@ function ProjectCard({
   );
 }
 
+/* --- New Project Modal --- */
 function NewProjectModal({
   onClose,
   onSuccess,
@@ -182,10 +221,10 @@ function NewProjectModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [repoUrl, setRepoUrl] = useState('');
-  const [branch, setBranch] = useState('main');
-  const [error, setError] = useState('');
+  const [name, setName] = useState("");
+  const [repoUrl, setRepoUrl] = useState("");
+  const [branch, setBranch] = useState("main");
+  const [error, setError] = useState("");
 
   const createMutation = useMutation({
     mutationFn: (input: CreateProjectInput) => api.createProject(input),
@@ -193,71 +232,74 @@ function NewProjectModal({
       onSuccess();
     },
     onError: (err: unknown) => {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create project";
       setError(errorMessage);
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     createMutation.mutate({ name, repoUrl, branch });
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <h2 className="text-2xl font-bold mb-4">New Project</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#111111] border border-gray-800 rounded-lg max-w-md w-full p-6">
+        <h2 className="text-lg font-semibold mb-4">New Project</h2>
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium mb-1">Project Name</label>
+            <label className="block text-xs text-gray-400 mb-1">Project Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-[#0a0a0a] border border-gray-700 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-500 text-sm"
               placeholder="my-awesome-app"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Repository URL</label>
+            <label className="block text-xs text-gray-400 mb-1">Repository URL</label>
             <input
               type="url"
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-[#0a0a0a] border border-gray-700 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-500 text-sm"
               placeholder="https://github.com/user/repo.git"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Branch</label>
+            <label className="block text-xs text-gray-400 mb-1">Branch</label>
             <input
               type="text"
               value={branch}
               onChange={(e) => setBranch(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-[#0a0a0a] border border-gray-700 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-500 text-sm"
               placeholder="main"
             />
           </div>
           {error && (
-            <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
+            <div className="p-2 bg-red-900/30 text-red-400 rounded-md text-xs">
+              {error}
+            </div>
           )}
-          <div className="flex gap-3">
+          <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition"
+              className="px-3 py-1.5 border border-gray-700 rounded-md text-sm hover:bg-[#1a1a1a] transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+              className="px-3 py-1.5 bg-white text-black rounded-md hover:bg-gray-200 transition text-sm disabled:opacity-50"
             >
-              {createMutation.isPending ? 'Creating...' : 'Create'}
+              {createMutation.isPending ? "Creating..." : "Create"}
             </button>
           </div>
         </form>
