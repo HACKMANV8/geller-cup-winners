@@ -16,6 +16,8 @@
     "firebase": "^12.4.0",
     "firebase-admin": "^12.7.0",
     "lucide-react": "^0.548.0",
+    "mongodb": "^6.20.0",
+    "mongoose": "^8.19.2",
     "next": "16.0.1",
     "react": "19.2.0",
     "react-dom": "19.2.0"
