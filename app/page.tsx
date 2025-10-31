@@ -153,7 +153,7 @@ export default function Home() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full appearance-none rounded-lg border border-gray-300/80 bg-white/90 px-4 py-2.5 text-gray-900 shadow-sm outline-none ring-0 transition placeholder:text-gray-400 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 dark:border-gray-700 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-400 dark:focus:border-indigo-500 dark:focus:ring-indigo-900"
+                  className="w-full appearance-none rounded-lg border border-gray-300/80 bg-white/90 px-4 py-2.5 text-gray-400 shadow-sm outline-none ring-0 transition placeholder:text-gray-400 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 dark:border-gray-700 dark:bg-white/5 dark:text-gray-400 dark:placeholder:text-gray-400 dark:focus:border-indigo-500 dark:focus:ring-indigo-900"
                   placeholder="you@example.com"
                   required
                 />
@@ -167,7 +167,7 @@ export default function Home() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full appearance-none rounded-lg border border-gray-300/80 bg-white/90 px-4 py-2.5 text-gray-900 shadow-sm outline-none ring-0 transition placeholder:text-gray-400 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 dark:border-gray-700 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-400 dark:focus:border-indigo-500 dark:focus:ring-indigo-900"
+                  className="w-full appearance-none rounded-lg border border-gray-300/80 bg-white/90 px-4 py-2.5 text-gray-400 shadow-sm outline-none ring-0 transition placeholder:text-gray-400 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 dark:border-gray-700 dark:bg-white/5 dark:text-gray-400 dark:placeholder:text-gray-400 dark:focus:border-indigo-500 dark:focus:ring-indigo-900"
                   placeholder="••••••••"
                   required
                   minLength={6}
