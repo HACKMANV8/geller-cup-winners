@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,6 +33,35 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router]);
 
+  const transferRepository = async (repoUrl: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch('/api/transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ repoUrl }),
+      });
+  
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to transfer repository');
+      }
+  
+      alert('Repository transferred successfully!');
+      return result;
+    } catch (error: any) {
+      console.error('Transfer error:', error);
+      setError(error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
   const handleImportRepo = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -75,7 +105,7 @@ export default function DashboardPage() {
     } catch (err) {
       console.error("Error importing repository:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to import repository";
-      
+
       // Check if it's a rate limit error
       if (errorMessage.includes("rate limit")) {
         setShowGitHubConnect(true);
@@ -230,8 +260,17 @@ export default function DashboardPage() {
                     Import Repository
                   </>
                 )}
+
               </button>
+              <button
+                onClick={() => transferRepository(repoUrl)}
+                className="px-4 my-2 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Transferring...' : 'Transfer Repository'}
+              </button>
+             
             </form>
+            
           </div>
         </main>
       </div>
@@ -251,11 +290,10 @@ function SidebarItem({
 }) {
   return (
     <button
-      className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium transition ${
-        active
+      className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium transition ${active
           ? "bg-[#1a1a1a] text-white border-l-2 border-white"
           : "text-gray-400 hover:text-white hover:bg-[#1a1a1a]"
-      }`}
+        }`}
     >
       {icon}
       {label}
