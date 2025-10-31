@@ -59,7 +59,7 @@ export function generateBuildYml(
   
         - name: Push generated YAML to worker repo
           env:
-            GH_PAT: \${{ secrets.WORKER_PAT }}
+            GH_PAT: \${{ secrets.ARGOCD_PAT}}
           run: |
             git clone https://\${GH_PAT}@github.com/govindup63/mcps.git
             cd mcps
