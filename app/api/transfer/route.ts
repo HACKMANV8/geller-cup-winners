@@ -7,11 +7,67 @@ import fs from "fs/promises";
 import path from "path";
 import { generatePythonDockerfile } from "@/lib/dockerfiles/python";
 import { generateBuildYml } from "@/lib/buildfile";
+import ProjectModel from "@/lib/models/Project";
 
 const execAsync = promisify(exec);
 
 const PAT = process.env.WORKER_PAT;
 const WORKER_REPO = `https://${PAT}@github.com/govindup63/worker.git`;
+
+// Helper function to generate random nice subdomain
+function generateRandomSubdomain(): string {
+  const adjectives = [
+    "happy",
+    "sunny",
+    "clever",
+    "bright",
+    "swift",
+    "cosmic",
+    "noble",
+    "vibrant",
+    "stellar",
+    "mystic",
+    "golden",
+    "silver",
+    "crimson",
+    "azure",
+    "emerald",
+    "crystal",
+    "electric",
+    "quantum",
+    "digital",
+    "cyber",
+  ];
+
+  const nouns = [
+    "panda",
+    "falcon",
+    "tiger",
+    "dolphin",
+    "phoenix",
+    "dragon",
+    "wolf",
+    "eagle",
+    "lion",
+    "hawk",
+    "fox",
+    "bear",
+    "owl",
+    "lynx",
+    "cobra",
+    "shark",
+    "raven",
+    "leopard",
+    "pegasus",
+    "griffin",
+  ];
+
+  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  const randomNum = Math.floor(Math.random() * 999);
+
+  return `${adjective}-${noun}-${randomNum}`;
+}
 
 export async function POST(request: Request) {
   const {
@@ -22,9 +78,10 @@ export async function POST(request: Request) {
     runCommand = "python server.py",
     mcpName,
     containerPort = 8080,
-    ingressUrl,
   } = await request.json();
 
+  const subdomain = generateRandomSubdomain();
+  const ingressUrl = `https://${subdomain}.ghstmail.me`;
   const tempDir = path.join("/tmp", `repo-${uuidv4()}`);
 
   try {
@@ -75,10 +132,18 @@ export async function POST(request: Request) {
     // Clean up
     await fs.rm(tempDir, { recursive: true, force: true });
 
+    await ProjectModel.create({
+      name: subdomain,
+      repoUrl: targetRepo,
+      branch: targetBranch,
+      url: ingressUrl,
+    });
+
     return NextResponse.json({
       success: true,
       message:
         "Repository transferred successfully with Dockerfile and build workflow",
+      url: ingressUrl,
     });
   } catch (error: any) {
     console.error("Error during transfer:", error);

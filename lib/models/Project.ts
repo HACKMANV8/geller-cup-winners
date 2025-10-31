@@ -1,4 +1,4 @@
-import mongoose, { Schema, Model, Document } from 'mongoose';
+import mongoose, { Schema, Model, Document } from "mongoose";
 
 export interface IProject extends Document {
   userId: string;
@@ -7,6 +7,7 @@ export interface IProject extends Document {
   branch?: string;
   createdAt: Date;
   updatedAt: Date;
+  url: string;
 }
 
 const ProjectSchema = new Schema<IProject>(
@@ -26,7 +27,11 @@ const ProjectSchema = new Schema<IProject>(
     },
     branch: {
       type: String,
-      default: 'main',
+      default: "main",
+    },
+    url: {
+      type: String,
+      default: "test.ghstmail.me",
     },
   },
   {
@@ -38,7 +43,7 @@ const ProjectSchema = new Schema<IProject>(
 ProjectSchema.index({ userId: 1, createdAt: -1 });
 
 // Prevent model recompilation in development
-const ProjectModel: Model<IProject> = 
-  mongoose.models.Project || mongoose.model<IProject>('Project', ProjectSchema);
+const ProjectModel: Model<IProject> =
+  mongoose.models.Project || mongoose.model<IProject>("Project", ProjectSchema);
 
 export default ProjectModel;
