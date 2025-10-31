@@ -1,7 +1,8 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchGitHubRepos, importRepository, GitHubRepo } from "@/app/actions/github.actions";
+import { fetchPublicRepoFiles } from "@/app/actions/github.actions";
+import GitHubConnect from "@/components/GitHubConnect";
 import {
   Home,
   Boxes,
@@ -9,21 +10,21 @@ import {
   Settings,
   LogOut,
   User,
-  Search,
+  Github,
+  AlertCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import RepoCard from "@/components/RepoCard";
 
 export default function DashboardPage() {
   const { user, loading: authLoading, logout, getIdToken } = useAuth();
   const router = useRouter();
-  const [repos, setRepos] = useState<GitHubRepo[]>([]);
-  const [filteredRepos, setFilteredRepos] = useState<GitHubRepo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [repoUrl, setRepoUrl] = useState("");
+  const [branch, setBranch] = useState("main");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [importingRepoId, setImportingRepoId] = useState<number | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [showGitHubConnect, setShowGitHubConnect] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -31,76 +32,59 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router]);
 
-  useEffect(() => {
-    if (user) {
-      loadRepositories();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  const handleImportRepo = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  useEffect(() => {
-    // Filter repos based on search query
-    if (searchQuery.trim() === "") {
-      setFilteredRepos(repos);
-    } else {
-      const query = searchQuery.toLowerCase();
-      setFilteredRepos(
-        repos.filter(
-          (repo) =>
-            repo.name.toLowerCase().includes(query) ||
-            repo.description?.toLowerCase().includes(query)
-        )
-      );
+    if (!repoUrl.trim()) {
+      setError("Please enter a GitHub repository URL");
+      return;
     }
-  }, [searchQuery, repos]);
 
-  const loadRepositories = async () => {
     try {
       setLoading(true);
       setError(null);
-      const token = await getIdToken();
-      if (!token) {
-        throw new Error("No authentication token");
-      }
-      const fetchedRepos = await fetchGitHubRepos(token);
-      setRepos(fetchedRepos);
-      setFilteredRepos(fetchedRepos);
-    } catch (err) {
-      console.error("Error loading repositories:", err);
-      setError(err instanceof Error ? err.message : "Failed to load repositories");
-    } finally {
-      setLoading(false);
-    }
-  };
+      setSuccess(null);
+      setShowGitHubConnect(false);
 
-  const handleImport = async (repo: GitHubRepo) => {
-    try {
-      setImportingRepoId(repo.id);
       const token = await getIdToken();
       if (!token) {
         throw new Error("No authentication token");
       }
 
-      const result = await importRepository(token, {
-        repoName: repo.name,
-        githubRepoId: repo.id,
-        cloneUrl: repo.clone_url,
-        description: repo.description,
-        defaultBranch: repo.default_branch,
-      });
+      const tempProjectId = `project_${Date.now()}`;
+      const result = await fetchPublicRepoFiles(
+        token,
+        tempProjectId,
+        repoUrl,
+        branch || "main"
+      );
 
       if (result.success) {
-        alert(`Successfully imported ${repo.name}!`);
-        // Optionally redirect to the project page
-        // router.push(`/projects/${result.projectId}`);
+        setSuccess(`Successfully imported ${result.fileCount} files from the repository!`);
+        setRepoUrl("");
+        setBranch("main");
       } else {
-        alert(`Failed to import: ${result.error}`);
+        // Check if it's a rate limit error
+        if (result.error?.includes("rate limit")) {
+          setShowGitHubConnect(true);
+          setError("GitHub API rate limit reached. Please connect your GitHub account for higher limits.");
+        } else {
+          setError(result.error || "Failed to import repository");
+        }
       }
     } catch (err) {
       console.error("Error importing repository:", err);
-      alert("Failed to import repository");
+      const errorMessage = err instanceof Error ? err.message : "Failed to import repository";
+      
+      // Check if it's a rate limit error
+      if (errorMessage.includes("rate limit")) {
+        setShowGitHubConnect(true);
+        setError("GitHub API rate limit reached. Please connect your GitHub account for higher limits.");
+      } else {
+        setError(errorMessage);
+      }
     } finally {
-      setImportingRepoId(null);
+      setLoading(false);
     }
   };
 
@@ -140,7 +124,7 @@ export default function DashboardPage() {
       <div className="flex-1 ml-60 flex flex-col">
         {/* Topbar */}
         <header className="sticky top-0 z-10 backdrop-blur-md bg-[#0a0a0acc] border-b border-gray-800 px-6 py-3 flex justify-between items-center">
-          <h2 className="text-lg font-semibold">GitHub Repositories</h2>
+          <h2 className="text-lg font-semibold">Import Repository</h2>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-[#111111] border border-gray-800 rounded-lg">
               <User className="h-4 w-4 text-gray-400" />
@@ -149,71 +133,106 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {/* Search Bar */}
-        {!loading && !error && repos.length > 0 && (
-          <div className="px-8 pt-6 pb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search repositories..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-[#111111] border border-gray-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-500 text-sm"
-              />
-            </div>
-          </div>
-        )}
-
         {/* Main Content */}
-        <main className="flex-1 px-8 py-6">
-          {error ? (
-            <div className="flex flex-col items-center justify-center text-center mt-20">
-              <div className="text-red-400 mb-2">Failed to load repositories.</div>
-              <p className="text-sm text-gray-500 mb-4">{error}</p>
-              <button
-                onClick={() => loadRepositories()}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-black rounded-md hover:bg-gray-200 transition text-sm"
-              >
-                Retry
-              </button>
-            </div>
-          ) : loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <div
-                  key={idx}
-                  className="bg-[#111111] border border-gray-800 rounded-lg p-5 animate-pulse"
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="h-5 w-32 bg-gray-800 rounded" />
-                    <div className="h-4 w-4 bg-gray-800 rounded" />
-                  </div>
-                  <div className="h-4 w-48 bg-gray-800 rounded" />
-                  <div className="mt-2 h-3 w-24 bg-gray-900 rounded" />
-                </div>
-              ))}
-            </div>
-          ) : filteredRepos && filteredRepos.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredRepos.map((repo) => (
-                <RepoCard
-                  key={repo.id}
-                  repo={repo}
-                  onImport={handleImport}
-                  importing={importingRepoId === repo.id}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center text-center mt-20">
-              <Rocket className="h-12 w-12 text-gray-600 mb-4" />
-              <h3 className="text-lg font-medium mb-2">No repositories found</h3>
-              <p className="text-gray-500 text-sm mb-6">
-                {searchQuery ? "No repositories match your search." : "Connect your GitHub account to see your repositories."}
+        <main className="flex-1 px-8 py-8 flex items-center justify-center">
+          <div className="w-full max-w-2xl">
+            <div className="text-center mb-8">
+              <Github className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h1 className="text-3xl font-bold mb-2">Import GitHub Repository</h1>
+              <p className="text-gray-400">
+                Enter a public GitHub repository URL to import and deploy
               </p>
             </div>
-          )}
+
+            {/* GitHub Connect Component */}
+            {showGitHubConnect && (
+              <div className="mb-6">
+                <div className="mb-4 p-4 bg-yellow-900/20 border border-yellow-500/50 rounded-lg text-yellow-400 text-sm flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium mb-1">Rate Limit Reached</p>
+                    <p className="text-yellow-300/80">
+                      Connect your GitHub account to get 5,000 requests/hour instead of 60 requests/hour.
+                    </p>
+                  </div>
+                </div>
+                <GitHubConnect />
+              </div>
+            )}
+
+            {/* Success Message */}
+            {success && (
+              <div className="mb-6 p-4 bg-green-900/20 border border-green-500/50 rounded-lg text-green-400 text-sm">
+                {success}
+              </div>
+            )}
+
+            {/* Error Message */}
+            {error && !showGitHubConnect && (
+              <div className="mb-6 p-4 bg-red-900/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Import Form */}
+            <form onSubmit={handleImportRepo} className="space-y-6">
+              <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 space-y-4">
+                <div>
+                  <label htmlFor="repoUrl" className="block text-sm font-medium mb-2">
+                    Repository URL
+                  </label>
+                  <input
+                    id="repoUrl"
+                    type="text"
+                    value={repoUrl}
+                    onChange={(e) => setRepoUrl(e.target.value)}
+                    placeholder="https://github.com/username/repository"
+                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
+                    disabled={loading}
+                  />
+                  <p className="mt-2 text-xs text-gray-500">
+                    Enter the full URL of a public GitHub repository
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="branch" className="block text-sm font-medium mb-2">
+                    Branch (optional)
+                  </label>
+                  <input
+                    id="branch"
+                    type="text"
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    placeholder="main"
+                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
+                    disabled={loading}
+                  />
+                  <p className="mt-2 text-xs text-gray-500">
+                    Default: main
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || !repoUrl.trim()}
+                className="w-full px-6 py-3 bg-white text-black rounded-lg hover:bg-gray-200 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Github className="h-4 w-4" />
+                    Import Repository
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
         </main>
       </div>
     </div>

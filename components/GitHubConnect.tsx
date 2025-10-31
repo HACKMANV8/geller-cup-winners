@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Github, CheckCircle, Loader } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 export default function GitHubConnect() {
   const { user } = useAuth();
@@ -12,17 +10,18 @@ export default function GitHubConnect() {
   const [connected, setConnected] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
 
-  useEffect(() => {
-    checkGitHubStatus();
-  }, [user]);
-
-  const checkGitHubStatus = async () => {
+  const checkGitHubStatus = useCallback(async () => {
     if (!user) return;
 
     try {
       const response = await fetch(
-        `${API_URL}/api/auth/github/status?firebaseUid=${user.uid}`
+        `/api/auth/github/status?firebaseUid=${user.uid}`
       );
+      
+      if (!response.ok) {
+        throw new Error('Failed to check status');
+      }
+      
       const data = await response.json();
       setConnected(data.connected);
       setUsername(data.username);
@@ -31,21 +30,32 @@ export default function GitHubConnect() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    checkGitHubStatus();
+  }, [checkGitHubStatus]);
 
   const handleConnect = async () => {
     if (!user) return;
 
     try {
       const response = await fetch(
-        `${API_URL}/api/auth/github/authorize?firebaseUid=${user.uid}`
+        `/api/auth/github/authorize?firebaseUid=${user.uid}`
       );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to initiate OAuth');
+      }
+      
       const data = await response.json();
       
       // Redirect to GitHub OAuth
       window.location.href = data.url;
     } catch (error) {
       console.error('Failed to initiate GitHub OAuth:', error);
+      alert(error instanceof Error ? error.message : 'Failed to connect to GitHub. Please check your OAuth configuration.');
     }
   };
 
