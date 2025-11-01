@@ -130,6 +130,7 @@ export async function POST(request: Request) {
       rootDir = ".",
       runCommand = "python server.py",
       containerPort = 8080,
+      userId,
     } = body;
 
     console.log("=== EXTRACTED PARAMETERS ===");
@@ -140,6 +141,7 @@ export async function POST(request: Request) {
       rootDir,
       runCommand,
       containerPort,
+      userId,
     });
     console.log("=== END PARAMETERS ===");
 
@@ -344,6 +346,7 @@ export async function POST(request: Request) {
     console.log("✓ Worker temp directory cleaned up");
 
     await ProjectModel.create({
+      userId,
       name: subdomain,
       repoUrl: targetRepo,
       branch: targetBranch,
@@ -359,7 +362,7 @@ export async function POST(request: Request) {
       success: true,
       message:
         "Repository transferred successfully with Dockerfile and build workflow",
-      url: ingressUrl,
+      url: `${ingressUrl}/sse`,
       subdomain,
     });
   } catch (error: any) {
