@@ -4,16 +4,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchPublicRepoFiles } from "@/app/actions/github.actions";
 import GitHubConnect from "@/components/GitHubConnect";
-import {
-  Home,
-  Boxes,
-  Rocket,
-  Settings,
-  LogOut,
-  User,
-  Github,
-  AlertCircle,
-} from "lucide-react";
+import { Home, Boxes, Rocket, Settings, LogOut, Github, AlertCircle, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -21,12 +12,84 @@ export default function DashboardPage() {
   const auth = useAuth();
   const { user, loading: authLoading, logout, getIdToken } = auth;
   const router = useRouter();
-  const [repoUrl, setRepoUrl] = useState("");
-  const [branch, setBranch] = useState("main");
+  const [formData, setFormData] = useState({
+    repoUrl: "",
+    branch: "main",
+    port: 8080,
+    rootDir: ".",
+    runCommand: "python server.py",
+    mcpName: "",
+    containerPort: 8080,
+    envVars: [] as Array<{ key: string; value: string }>,
+    envInput: ""
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showGitHubConnect, setShowGitHubConnect] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'port' || name === 'containerPort' ? Number(value) : value
+    }));
+  };
+
+  const parseEnvVars = (envString: string) => {
+    const lines = envString.split('\n');
+    const vars = [];
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Skip comments and empty lines
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      
+      const match = trimmed.match(/^([^=#]+?)\s*=\s*(.*)?\s*$/);
+      if (match) {
+        const key = match[1].trim();
+        const value = (match[2] || '').trim();
+        // Remove surrounding quotes if present
+        const cleanValue = value.replace(/^['"](.*)['"]$/, '$1');
+        vars.push({ key, value: cleanValue });
+      }
+    }
+    
+    return vars;
+  };
+
+  const handleEnvInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const { value } = e.target;
+    const vars = parseEnvVars(value);
+    
+    setFormData(prev => ({
+      ...prev,
+      envInput: value,
+      envVars: vars
+    }));
+  };
+
+  const handleAddEnvVar = () => {
+    setFormData(prev => ({
+      ...prev,
+      envVars: [...prev.envVars, { key: '', value: '' }]
+    }));
+  };
+
+  const handleEnvVarChange = (index: number, field: 'key' | 'value', newValue: string) => {
+    setFormData(prev => {
+      const newEnvVars = [...prev.envVars];
+      newEnvVars[index] = { ...newEnvVars[index], [field]: newValue };
+      return { ...prev, envVars: newEnvVars };
+    });
+  };
+
+  const removeEnvVar = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      envVars: prev.envVars.filter((_, i) => i !== index)
+    }));
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -63,10 +126,10 @@ export default function DashboardPage() {
       setLoading(false);
     }
   };
-  const handleImportRepo = async (e: React.FormEvent) => {
+  const handleDeploy = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!repoUrl.trim()) {
+    if (!formData.repoUrl.trim()) {
       setError("Please enter a GitHub repository URL");
       return;
     }
@@ -82,27 +145,43 @@ export default function DashboardPage() {
         throw new Error("No authentication token");
       }
 
-      const tempProjectId = `project_${Date.now()}`;
-      const result = await fetchPublicRepoFiles(
-        token,
-        tempProjectId,
-        repoUrl,
-        branch || "main"
-      );
+      const response = await fetch('/api/transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          targetRepo: formData.repoUrl,
+          targetBranch: formData.branch,
+          port: formData.port,
+          rootDir: formData.rootDir,
+          runCommand: formData.runCommand,
+          mcpName: formData.mcpName || undefined,
+          containerPort: formData.containerPort,
+          userId: user?.uid
+        })
+      });
 
-      if (result.success) {
-        setSuccess(`Successfully imported ${result.fileCount} files from the repository!`);
-        setRepoUrl("");
-        setBranch("main");
-      } else {
-        // Check if it's a rate limit error
-        if (result.error?.includes("rate limit")) {
-          setShowGitHubConnect(true);
-          setError("GitHub API rate limit reached. Please connect your GitHub account for higher limits.");
-        } else {
-          setError(result.error || "Failed to import repository");
-        }
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Deployment failed');
       }
+
+      setSuccess("Deployment started successfully!");
+      // Reset form
+      setFormData({
+        repoUrl: "",
+        branch: "main",
+        port: 8080,
+        rootDir: ".",
+        runCommand: "python server.py",
+        mcpName: "",
+        containerPort: 8080,
+        envVars: [],
+        envInput: ""
+      });
     } catch (err) {
       console.error("Error importing repository:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to import repository";
@@ -206,48 +285,234 @@ export default function DashboardPage() {
             )}
 
             {/* Import Form */}
-            <form onSubmit={handleImportRepo} className="space-y-6">
-              <div className="bg-[#111111] border border-gray-800 rounded-lg p-6 space-y-4">
-                <div>
-                  <label htmlFor="repoUrl" className="block text-sm font-medium mb-2">
-                    Repository URL
-                  </label>
-                  <input
-                    id="repoUrl"
-                    type="text"
-                    value={repoUrl}
-                    onChange={(e) => setRepoUrl(e.target.value)}
-                    placeholder="https://github.com/username/repository"
-                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
-                    disabled={loading}
-                  />
-                  <p className="mt-2 text-xs text-gray-500">
-                    Enter the full URL of a public GitHub repository
-                  </p>
-                </div>
+            <form onSubmit={handleDeploy} className="space-y-6">
+              <div className="bg-[#111111] border border-gray-800 rounded-lg p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Repository URL */}
+                  <div className="col-span-2">
+                    <label htmlFor="repoUrl" className="block text-sm font-medium mb-2">
+                      Repository URL <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="repoUrl"
+                      type="text"
+                      name="repoUrl"
+                      value={formData.repoUrl}
+                      onChange={handleInputChange}
+                      placeholder="https://github.com/username/repository"
+                      className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
+                      disabled={loading}
+                      required
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      Enter the full URL of a public GitHub repository
+                    </p>
+                  </div>
 
-                <div>
-                  <label htmlFor="branch" className="block text-sm font-medium mb-2">
-                    Branch (optional)
-                  </label>
-                  <input
-                    id="branch"
-                    type="text"
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
-                    placeholder="main"
-                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
-                    disabled={loading}
-                  />
-                  <p className="mt-2 text-xs text-gray-500">
-                    Default: main
-                  </p>
+                  {/* Project Name */}
+                  <div>
+                    <label htmlFor="mcpName" className="block text-sm font-medium mb-2">
+                      Project Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="mcpName"
+                      name="mcpName"
+                      type="text"
+                      value={formData.mcpName}
+                      onChange={handleInputChange}
+                      placeholder="my-awesome-project"
+                      className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
+                      disabled={loading}
+                      required
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      A name for your project
+                    </p>
+                  </div>
+
+                  {/* Branch */}
+                  <div>
+                    <label htmlFor="branch" className="block text-sm font-medium mb-2">
+                      Branch
+                    </label>
+                    <input
+                      id="branch"
+                      name="branch"
+                      type="text"
+                      value={formData.branch}
+                      onChange={handleInputChange}
+                      placeholder="main"
+                      className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
+                      disabled={loading}
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      Default: main
+                    </p>
+                  </div>
+
+                  {/* Root Directory */}
+                  <div>
+                    <label htmlFor="rootDir" className="block text-sm font-medium mb-2">
+                      Root Directory
+                    </label>
+                    <input
+                      id="rootDir"
+                      name="rootDir"
+                      type="text"
+                      value={formData.rootDir}
+                      onChange={handleInputChange}
+                      placeholder="."
+                      className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
+                      disabled={loading}
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      Path to your application root (e.g., &apos;src&apos; or &apos;app&apos;)
+                    </p>
+                  </div>
+
+                  {/* Run Command */}
+                  <div className="col-span-2">
+                    <label htmlFor="runCommand" className="block text-sm font-medium mb-2">
+                      Start Command
+                    </label>
+                    <input
+                      id="runCommand"
+                      name="runCommand"
+                      type="text"
+                      value={formData.runCommand}
+                      onChange={handleInputChange}
+                      placeholder="python server.py"
+                      className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
+                      disabled={loading}
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      Command to start your application
+                    </p>
+                  </div>
+
+                  {/* Port Configuration */}
+                  <div className="grid grid-cols-2 gap-4 col-span-2">
+                    <div>
+                      <label htmlFor="port" className="block text-sm font-medium mb-2">
+                        Host Port
+                      </label>
+                      <input
+                        id="port"
+                        name="port"
+                        type="number"
+                        min="1"
+                        max="65535"
+                        value={formData.port}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
+                        disabled={loading}
+                      />
+                      <p className="mt-2 text-xs text-gray-500">
+                        Port on your machine
+                      </p>
+                    </div>
+                    <div>
+                      <label htmlFor="containerPort" className="block text-sm font-medium mb-2">
+                        Container Port
+                      </label>
+                      <input
+                        id="containerPort"
+                        name="containerPort"
+                        type="number"
+                        min="1"
+                        max="65535"
+                        value={formData.containerPort}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
+                        disabled={loading}
+                      />
+                      <p className="mt-2 text-xs text-gray-500">
+                        Port inside container
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Environment Variables */}
+                  <div className="col-span-2 mt-6">
+                    <h3 className="text-sm font-medium mb-4">Environment Variables</h3>
+                    
+                    {/* Env Input Textarea */}
+                    <div className="mb-6">
+                      <label htmlFor="envInput" className="block text-sm font-medium mb-2">
+                        Paste .env file content
+                      </label>
+                      <textarea
+                        id="envInput"
+                        name="envInput"
+                        value={formData.envInput}
+                        onChange={handleEnvInputChange}
+                        placeholder="DATABASE_URL=your-db-url\nAPI_KEY=your-api-key"
+                        className="w-full h-32 px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm font-mono"
+                        disabled={loading}
+                      />
+                      <p className="mt-2 text-xs text-gray-500">
+                        Paste your .env file content here or add variables below
+                      </p>
+                    </div>
+
+                    {/* Env Variables List */}
+                    <div className="space-y-4">
+                      {formData.envVars.map((env, index) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              placeholder="Variable name"
+                              value={env.key}
+                              onChange={(e) => handleEnvVarChange(index, 'key', e.target.value)}
+                              className="w-full px-3 py-2 bg-[#0a0a0a] border border-gray-800 rounded focus:outline-none focus:ring-1 focus:ring-white focus:border-transparent text-sm"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              placeholder="Value"
+                              value={env.value}
+                              onChange={(e) => handleEnvVarChange(index, 'value', e.target.value)}
+                              className="w-full px-3 py-2 bg-[#0a0a0a] border border-gray-800 rounded focus:outline-none focus:ring-1 focus:ring-white focus:border-transparent text-sm"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeEnvVar(index)}
+                            className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                            disabled={loading}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18"></path>
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                              <line x1="10" y1="11" x2="10" y2="17"></line>
+                              <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={handleAddEnvVar}
+                        className="mt-2 text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                        disabled={loading}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                          <line x1="12" y1="5" x2="12" y2="19"></line>
+                          <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Add Variable
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <button
                 type="submit"
-                disabled={loading || !repoUrl.trim()}
+                disabled={loading || !formData.repoUrl.trim()}
                 className="w-full px-6 py-3 bg-white text-black rounded-lg hover:bg-gray-200 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
@@ -262,12 +527,6 @@ export default function DashboardPage() {
                   </>
                 )}
 
-              </button>
-              <button
-                onClick={() => transferRepository(repoUrl)}
-                className="px-4 my-2 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? 'Transferring...' : 'Transfer Repository'}
               </button>
              
             </form>
