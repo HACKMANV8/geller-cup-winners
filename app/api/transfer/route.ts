@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { v4 as uuidv4 } from "uuid";
+import { connectToDatabase } from "@/lib/mongodb";
 import fs from "fs/promises";
 import path from "path";
 import { generatePythonDockerfile } from "@/lib/dockerfiles/python";
@@ -82,6 +83,10 @@ export async function POST(request: Request) {
   let rawBody = "";
 
   try {
+    // Connect to MongoDB
+    await connectToDatabase();
+    console.log("✓ Connected to MongoDB");
+    
     // Validate PAT is available
     if (!PAT) {
       console.error("WORKER_PAT environment variable is not set");
@@ -130,7 +135,7 @@ export async function POST(request: Request) {
       rootDir = ".",
       runCommand = "python server.py",
       containerPort = 8080,
-      userId,
+      userId
     } = body;
 
     console.log("=== EXTRACTED PARAMETERS ===");
@@ -151,6 +156,14 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: "targetRepo is required" },
         { status: 400 }
+      );
+    }
+
+    if (!userId) {
+      console.error("Validation failed: userId is missing");
+      return NextResponse.json(
+        { success: false, error: "User authentication required" },
+        { status: 401 }
       );
     }
     const subdomain = generateRandomSubdomain();
@@ -345,12 +358,16 @@ export async function POST(request: Request) {
     await fs.rm(tempWorkerDir, { recursive: true, force: true });
     console.log("✓ Worker temp directory cleaned up");
 
+    if (!userId) {
+      throw new Error('User ID is required to create a project');
+    }
+    
     await ProjectModel.create({
-      userId,
       name: subdomain,
       repoUrl: targetRepo,
       branch: targetBranch,
       url: ingressUrl,
+      userId: userId
     });
 
     console.log("=== SUCCESS ===");
