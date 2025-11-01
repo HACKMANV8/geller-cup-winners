@@ -18,9 +18,9 @@ import {
   ArrowRight,
   Github,
   CheckCircle,
-  AlertCircle,
   RefreshCw,
   Rocket,
+  Trash2,
 } from "lucide-react";
 import GitHubConnect from "@/components/GitHubConnect";
 
@@ -51,6 +51,8 @@ export default function ProjectsPage() {
     rootDir: ".",
     runCommand: "python server.py",
     containerPort: 8080,
+    envVars: [] as Array<{ key: string; value: string }>,
+    envInput: "",
   });
   const [deploying, setDeploying] = React.useState(false);
   const [deployError, setDeployError] = React.useState<string | null>(null);
@@ -103,7 +105,6 @@ export default function ProjectsPage() {
   const {
     data: githubRepos = [],
     isLoading: loadingRepos,
-    refetch: refetchRepos,
   } = useQuery<GitHubRepo[]>({
     queryKey: ["github-repos"],
     queryFn: async () => {
@@ -177,8 +178,7 @@ export default function ProjectsPage() {
       }
 
       // Success - close modal and refresh projects
-      setShowDeployModal(false);
-      setSelectedRepo(null);
+      closeDeployModal();
       refetch();
       alert(
         `MCP Server deployed successfully!\n\nURL: ${result.url}\nSubdomain: ${result.subdomain}`
@@ -195,6 +195,73 @@ export default function ProjectsPage() {
     setSelectedRepo(repo);
     setShowDeployModal(true);
     setDeployError(null);
+  };
+
+  const parseEnvVars = (envString: string) => {
+    const lines = envString.split('\n');
+    const vars = [];
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Skip comments and empty lines
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      
+      const match = trimmed.match(/^([^=#]+?)\s*=\s*(.*)?\s*$/);
+      if (match) {
+        const key = match[1].trim();
+        const value = (match[2] || '').trim();
+        // Remove surrounding quotes if present
+        const cleanValue = value.replace(/^['"](.*)['"]$/, '$1');
+        vars.push({ key, value: cleanValue });
+      }
+    }
+    
+    return vars;
+  };
+
+  const handleEnvInputChange = (value: string) => {
+    const vars = parseEnvVars(value);
+    setDeployForm(prev => ({
+      ...prev,
+      envInput: value,
+      envVars: vars
+    }));
+  };
+
+  const handleAddEnvVar = () => {
+    setDeployForm(prev => ({
+      ...prev,
+      envVars: [...prev.envVars, { key: '', value: '' }]
+    }));
+  };
+
+  const handleEnvVarChange = (index: number, field: 'key' | 'value', newValue: string) => {
+    setDeployForm(prev => {
+      const newEnvVars = [...prev.envVars];
+      newEnvVars[index] = { ...newEnvVars[index], [field]: newValue };
+      return { ...prev, envVars: newEnvVars };
+    });
+  };
+
+  const removeEnvVar = (index: number) => {
+    setDeployForm(prev => ({
+      ...prev,
+      envVars: prev.envVars.filter((_, i) => i !== index)
+    }));
+  };
+
+  const closeDeployModal = () => {
+    setShowDeployModal(false);
+    setSelectedRepo(null);
+    setDeployError(null);
+    setDeployForm({
+      port: 8080,
+      rootDir: ".",
+      runCommand: "python server.py",
+      containerPort: 8080,
+      envVars: [],
+      envInput: "",
+    });
   };
 
   if (authLoading || isLoading) {
@@ -360,11 +427,7 @@ export default function ProjectsPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    setShowDeployModal(false);
-                    setSelectedRepo(null);
-                    setDeployError(null);
-                  }}
+                  onClick={closeDeployModal}
                   className="p-2 text-gray-400 hover:text-white transition"
                 >
                   ✕
@@ -471,14 +534,79 @@ export default function ProjectsPage() {
                   </div>
                 </div>
 
+                {/* Environment Variables Section */}
+                <div className="col-span-2 mt-6">
+                  <h3 className="text-sm font-medium mb-4">Environment Variables</h3>
+                  
+                  {/* Env Input Textarea */}
+                  <div className="mb-6">
+                    <label htmlFor="envInput" className="block text-sm font-medium mb-2">
+                      Paste .env file content
+                    </label>
+                    <textarea
+                      id="envInput"
+                      value={deployForm.envInput}
+                      onChange={(e) => handleEnvInputChange(e.target.value)}
+                      placeholder="DATABASE_URL=your-db-url&#10;API_KEY=your-api-key"
+                      className="w-full h-32 px-4 py-3 bg-black border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm font-mono"
+                      disabled={deploying}
+                    />
+                    <p className="mt-2 text-xs text-gray-500">
+                      Paste your .env file content here or add variables below
+                    </p>
+                  </div>
+
+                  {/* Env Variables List */}
+                  <div className="space-y-4">
+                    {deployForm.envVars.map((env, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            placeholder="Variable name"
+                            value={env.key}
+                            onChange={(e) => handleEnvVarChange(index, 'key', e.target.value)}
+                            className="w-full px-3 py-2 bg-black border border-gray-800 rounded focus:outline-none focus:ring-1 focus:ring-white focus:border-transparent text-sm"
+                            disabled={deploying}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            placeholder="Value"
+                            value={env.value}
+                            onChange={(e) => handleEnvVarChange(index, 'value', e.target.value)}
+                            className="w-full px-3 py-2 bg-black border border-gray-800 rounded focus:outline-none focus:ring-1 focus:ring-white focus:border-transparent text-sm"
+                            disabled={deploying}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeEnvVar(index)}
+                          className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                          disabled={deploying}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={handleAddEnvVar}
+                      className="mt-2 text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                      disabled={deploying}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Variable
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowDeployModal(false);
-                      setSelectedRepo(null);
-                      setDeployError(null);
-                    }}
+                    onClick={closeDeployModal}
                     disabled={deploying}
                     className="flex-1 px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
