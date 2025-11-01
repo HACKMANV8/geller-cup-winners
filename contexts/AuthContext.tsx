@@ -12,8 +12,7 @@ import {
   GithubAuthProvider,
   signInWithPopup
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase/client';
+import { auth } from '@/lib/firebase/client';
 
 type User = {
   uid: string;
@@ -109,21 +108,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await updateProfile(auth.currentUser, {
           displayName: displayName
         });
-        const userDocRef = doc(db, 'users', userCredential.user.uid);
-        await setDoc(userDocRef, {
-          email: userCredential.user.email,
-          displayName: displayName,
-          createdAt: new Date().toISOString(),
-        });
+        
+        // Save user to MongoDB via API
+        try {
+          const token = await userCredential.user.getIdToken();
+          await fetch('/api/users', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              uid: userCredential.user.uid,
+              email: userCredential.user.email,
+              displayName: displayName,
+              provider: 'email'
+            })
+          });
+        } catch (dbError) {
+          console.error('Error saving user to database:', dbError);
+          // Continue anyway - user is created in Firebase Auth
+        }
+        
         setUser({
           uid: userCredential.user.uid,
           email: userCredential.user.email,
           displayName: displayName,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating account:', error);
-      throw error;
+      
+      // Handle specific Firebase auth errors
+      let errorMessage = 'Failed to create account';
+      
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'An account with this email already exists';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Please enter a valid email address';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Password should be at least 6 characters';
+          break;
+        default:
+          errorMessage = error.message || 'An error occurred during sign up';
+      }
+      
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -152,19 +185,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const provider = new GithubAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
-      // Check if user already exists in Firestore
-      const userDocRef = doc(db, 'users', result.user.uid);
-      const userDoc = await getDoc(userDocRef);
-      
-      // If user doesn't exist, create a new user document
-      if (!userDoc.exists()) {
-        await setDoc(userDocRef, {
-          email: result.user.email,
-          displayName: result.user.displayName || result.user.email?.split('@')[0] || 'GitHub User',
-          createdAt: new Date().toISOString(),
-          photoURL: result.user.photoURL || null,
-          provider: 'github'
+      // Save user to MongoDB via API
+      try {
+        const token = await result.user.getIdToken();
+        await fetch('/api/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            uid: result.user.uid,
+            email: result.user.email,
+            displayName: result.user.displayName || result.user.email?.split('@')[0] || 'GitHub User',
+            photoURL: result.user.photoURL || null,
+            provider: 'github'
+          })
         });
+      } catch (dbError) {
+        console.error('Error saving user to database:', dbError);
+        // Continue anyway - user is authenticated in Firebase
       }
       
       return result.user;

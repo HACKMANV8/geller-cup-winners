@@ -18,14 +18,13 @@ export default function DashboardPage() {
     port: 8080,
     rootDir: ".",
     runCommand: "python server.py",
-    mcpName: "",
     containerPort: 8080,
     envVars: [] as Array<{ key: string; value: string }>,
     envInput: ""
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{message: string; url?: string} | null>(null);
+  const [success, setSuccess] = useState<{message: string; url?: string; subdomain?: string} | null>(null);
   const [showGitHubConnect, setShowGitHubConnect] = useState(false);
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
 
@@ -98,35 +97,6 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router]);
 
-  const transferRepository = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await fetch('/api/transfer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ formData }),
-      });
-  
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to transfer repository');
-      }
-  
-      alert('Repository transferred successfully!');
-      return result;
-    } catch (error: any) {
-      console.error('Transfer error:', error);
-      setError(error.message);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
   const handleDeploy = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -173,7 +143,8 @@ export default function DashboardPage() {
 
       setSuccess({
         message: "Deployment started successfully!",
-        url: result.url || null
+        url: result.url || null,
+        subdomain: result.subdomain || null
       });
       setDeploymentUrl(result.url || null);
       // Reset form but keep the deployment URL
@@ -183,7 +154,6 @@ export default function DashboardPage() {
         port: 8080,
         rootDir: ".",
         runCommand: "python server.py",
-        mcpName: "",
         containerPort: 8080,
         envVars: [],
         envInput: ""
@@ -246,7 +216,7 @@ export default function DashboardPage() {
       <div className="flex-1 ml-60 flex flex-col">
         {/* Topbar */}
         <header className="sticky top-0 z-10 backdrop-blur-md bg-[#0a0a0acc] border-b border-gray-800 px-6 py-3 flex justify-between items-center">
-          <h2 className="text-lg font-semibold">Import Repository</h2>
+          <h2 className="text-lg font-semibold">Deploy MCP Server</h2>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-[#111111] border border-gray-800 rounded-lg">
               <User className="h-4 w-4 text-gray-400" />
@@ -259,10 +229,10 @@ export default function DashboardPage() {
         <main className="flex-1 px-8 py-8 flex items-center justify-center">
           <div className="w-full max-w-2xl">
             <div className="text-center mb-8">
-              <Github className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h1 className="text-3xl font-bold mb-2">Import GitHub Repository</h1>
+              <Rocket className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <h1 className="text-3xl font-bold mb-2">Deploy Your MCP Server</h1>
               <p className="text-gray-400">
-                Enter a public GitHub repository URL to import and deploy
+                Import your GitHub repository and deploy it as an MCP server with auto-generated subdomain
               </p>
             </div>
 
@@ -270,7 +240,7 @@ export default function DashboardPage() {
             {showGitHubConnect && (
               <div className="mb-6">
                 <div className="mb-4 p-4 bg-yellow-900/20 border border-yellow-500/50 rounded-lg text-yellow-400 text-sm flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
                   <div>
                     <p className="font-medium mb-1">Rate Limit Reached</p>
                     <p className="text-yellow-300/80">
@@ -286,19 +256,25 @@ export default function DashboardPage() {
             {success && (
               <div className="mb-6 p-4 bg-green-900/20 border border-green-500/50 rounded-lg text-green-400 text-sm">
                 <p className="font-medium mb-2">{success.message}</p>
+                {success.subdomain && (
+                  <div className="mt-2 mb-3 p-3 bg-green-950/30 rounded border border-green-500/30">
+                    <p className="text-xs text-green-300/80 mb-1">Generated Subdomain:</p>
+                    <p className="font-mono text-green-200 font-semibold">{success.subdomain}</p>
+                  </div>
+                )}
                 {success.url && (
                   <div className="mt-2">
-                    <p className="text-sm text-green-300 mb-1">Your application will be available at:</p>
+                    <p className="text-sm text-green-300 mb-1">Your MCP server will be available at:</p>
                     <a 
                       href={success.url} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 break-all"
+                      className="text-blue-400 hover:text-blue-300 break-all font-mono text-sm"
                     >
                       {success.url}
                     </a>
-                    <p className="text-xs text-green-500/80 mt-2">
-                      Note: It may take a few minutes for the deployment to complete.
+                    <p className="text-xs text-green-500/80 mt-3">
+                      ⏱️ Deployment in progress: It may take 2-3 minutes for your MCP server to be fully deployed and accessible.
                     </p>
                   </div>
                 )}
@@ -333,28 +309,7 @@ export default function DashboardPage() {
                       required
                     />
                     <p className="mt-2 text-xs text-gray-500">
-                      Enter the full URL of a public GitHub repository
-                    </p>
-                  </div>
-
-                  {/* Project Name */}
-                  <div>
-                    <label htmlFor="mcpName" className="block text-sm font-medium mb-2">
-                      Project Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="mcpName"
-                      name="mcpName"
-                      type="text"
-                      value={formData.mcpName}
-                      onChange={handleInputChange}
-                      placeholder="my-awesome-project"
-                      className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-sm"
-                      disabled={loading}
-                      required
-                    />
-                    <p className="mt-2 text-xs text-gray-500">
-                      A name for your project
+                      Enter the full URL of a public GitHub repository. A unique subdomain will be automatically generated.
                     </p>
                   </div>
 
@@ -546,12 +501,12 @@ export default function DashboardPage() {
                 {loading ? (
                   <>
                     <div className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                    Importing...
+                    Deploying MCP Server...
                   </>
                 ) : (
                   <>
-                    <Github className="h-4 w-4" />
-                    Import Repository
+                    <Rocket className="h-4 w-4" />
+                    Deploy MCP Server
                   </>
                 )}
 
