@@ -97,7 +97,7 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router]);
 
-  const transferRepository = async (repoUrl: string) => {
+  const transferRepository = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -107,7 +107,7 @@ export default function DashboardPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ repoUrl }),
+        body: JSON.stringify({ formData }),
       });
   
       const result = await response.json();
@@ -145,6 +145,8 @@ export default function DashboardPage() {
         throw new Error("No authentication token");
       }
 
+ 
+
       const response = await fetch('/api/transfer', {
         method: 'POST',
         headers: {
@@ -157,7 +159,6 @@ export default function DashboardPage() {
           port: formData.port,
           rootDir: formData.rootDir,
           runCommand: formData.runCommand,
-          mcpName: formData.mcpName || undefined,
           containerPort: formData.containerPort,
           userId: user?.uid
         })
