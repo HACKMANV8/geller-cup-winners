@@ -25,8 +25,9 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{message: string; url?: string} | null>(null);
   const [showGitHubConnect, setShowGitHubConnect] = useState(false);
+  const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -170,8 +171,12 @@ export default function DashboardPage() {
         throw new Error(result.error || 'Deployment failed');
       }
 
-      setSuccess("Deployment started successfully!");
-      // Reset form
+      setSuccess({
+        message: "Deployment started successfully!",
+        url: result.url || null
+      });
+      setDeploymentUrl(result.url || null);
+      // Reset form but keep the deployment URL
       setFormData({
         repoUrl: "",
         branch: "main",
@@ -274,7 +279,23 @@ export default function DashboardPage() {
             {/* Success Message */}
             {success && (
               <div className="mb-6 p-4 bg-green-900/20 border border-green-500/50 rounded-lg text-green-400 text-sm">
-                {success}
+                <p className="font-medium mb-2">{success.message}</p>
+                {success.url && (
+                  <div className="mt-2">
+                    <p className="text-sm text-green-300 mb-1">Your application will be available at:</p>
+                    <a 
+                      href={success.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 break-all"
+                    >
+                      {success.url}
+                    </a>
+                    <p className="text-xs text-green-500/80 mt-2">
+                      Note: It may take a few minutes for the deployment to complete.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
