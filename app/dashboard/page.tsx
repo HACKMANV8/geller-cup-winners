@@ -220,7 +220,13 @@ export default function DashboardPage() {
           </div>
           <nav className="mt-6 space-y-1">
             <SidebarItem icon={<Home className="h-4 w-4" />} label="Dashboard" active />
-            <SidebarItem icon={<Boxes className="h-4 w-4" />} label="Projects" />
+            <button
+              onClick={() => router.push('/projects')}
+              className="w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium transition text-gray-400 hover:text-white hover:bg-[#1a1a1a]"
+            >
+              <Boxes className="h-4 w-4" />
+              Projects
+            </button>
             <SidebarItem icon={<Rocket className="h-4 w-4" />} label="Deployments" />
             <SidebarItem icon={<Settings className="h-4 w-4" />} label="Settings" />
           </nav>

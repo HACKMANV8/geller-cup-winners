@@ -23,12 +23,18 @@ export const api = {
   // Projects
   getProjects: async (): Promise<Project[]> => {
     const { data } = await apiClient.get('/projects');
-    return data;
+    return data.projects || data;
   },
 
   getProject: async (id: string): Promise<Project> => {
     const { data } = await apiClient.get(`/projects/${id}`);
-    return data;
+    return data.project || data;
+  },
+
+  getProjectDeployments: async (projectId: string): Promise<Deployment[]> => {
+    // TODO: Implement when deployment API is ready
+    const { data } = await apiClient.get(`/projects/${projectId}/deployments`);
+    return data.deployments || [];
   },
 
   createProject: async (input: CreateProjectInput): Promise<Project> => {

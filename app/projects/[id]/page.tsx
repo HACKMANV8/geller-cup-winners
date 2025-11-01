@@ -5,6 +5,9 @@ import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api';
+import { Project as ProjectType } from '@/types';
 import { 
   Activity, 
   Settings, 
@@ -70,38 +73,64 @@ type Analytics = {
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { user, getIdToken } = useAuth();
   const projectId = params.id as string;
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Fetch project data (replace with your API)
-  const { data: project, isLoading: projectLoading } = useQuery<Project>({
+  // Fetch project data from MongoDB
+  const { data: projectData, isLoading: projectLoading } = useQuery<ProjectType>({
     queryKey: ['project', projectId],
     queryFn: async () => {
-      // Replace with: return api.getProject(projectId);
-      throw new Error('Connect to backend');
+      const token = await getIdToken();
+      if (!token) throw new Error('Not authenticated');
+      return api.getProject(projectId);
     },
-    enabled: false // Set to true when backend is ready
+    enabled: !!user && !!projectId,
   });
 
-  // Fetch deployments (replace with your API)
-  const { data: deployments, isLoading: deploymentsLoading } = useQuery<Deployment[]>({
+  // Fetch deployments (for now, return empty array until deployment API is ready)
+  const { data: deploymentsData, isLoading: deploymentsLoading } = useQuery({
     queryKey: ['deployments', projectId],
     queryFn: async () => {
-      // Replace with: return api.getDeployments(projectId);
-      throw new Error('Connect to backend');
+      try {
+        const deployments = await api.getProjectDeployments(projectId);
+        // Map Deployment type from types/index.ts to local Deployment type
+        return deployments.map((dep: any) => ({
+          id: dep._id,
+          status: dep.status.toLowerCase() as DeploymentStatus,
+          branch: dep.branch || 'main',
+          commit: dep.commitMessage || 'No message',
+          commitHash: dep.commitHash?.substring(0, 7) || 'unknown',
+          url: dep.imageUri || null,
+          timestamp: dep.createdAt,
+          duration: '0s',
+          creator: 'System',
+        }));
+      } catch {
+        // Deployment API not implemented yet, return empty array
+        return [];
+      }
     },
-    enabled: false // Set to true when backend is ready
+    enabled: !!user && !!projectId,
   });
 
-  // Fetch analytics (replace with your API)
-  const { data: analytics, isLoading: analyticsLoading } = useQuery<Analytics>({
-    queryKey: ['analytics', projectId],
-    queryFn: async () => {
-      // Replace with: return api.getAnalytics(projectId);
-      throw new Error('Connect to backend');
-    },
-    enabled: false // Set to true when backend is ready
-  });
+  const deployments: Deployment[] = deploymentsData || [];
+
+  // Analytics not implemented yet
+  const analytics = undefined;
+  const analyticsLoading = false;
+
+  // Map MongoDB Project to UI Project format
+  const project: Project | null = projectData ? {
+    id: projectData._id,
+    name: projectData.name,
+    repository: projectData.repoUrl,
+    branch: projectData.branch || 'main',
+    domain: (projectData as { url?: string }).url || `${projectData.name}.vercel.app`,
+    framework: 'Next.js', // TODO: Get from project data
+    lastDeployed: projectData.updatedAt,
+    status: 'active',
+  } : null;
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Activity },
@@ -124,10 +153,10 @@ export default function ProjectDetailPage() {
         <div className="text-center">
           <h2 className="text-xl font-bold text-gray-100 mb-2">Project not found</h2>
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/projects')}
             className="text-blue-400 hover:text-blue-300"
           >
-            Back to Dashboard
+            Back to Projects
           </button>
         </div>
       </div>
@@ -141,7 +170,7 @@ export default function ProjectDetailPage() {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center gap-2 text-sm text-gray-400 mb-3">
             <span 
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/projects')}
               className="hover:text-gray-200 cursor-pointer"
             >
               Projects
