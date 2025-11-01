@@ -129,7 +129,6 @@ export async function POST(request: Request) {
       port = 8080,
       rootDir = ".",
       runCommand = "python server.py",
-      mcpName,
       containerPort = 8080,
     } = body;
 
@@ -140,7 +139,6 @@ export async function POST(request: Request) {
       port,
       rootDir,
       runCommand,
-      mcpName,
       containerPort,
     });
     console.log("=== END PARAMETERS ===");
@@ -153,16 +151,8 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    if (!mcpName) {
-      console.error("Validation failed: mcpName is missing");
-      return NextResponse.json(
-        { success: false, error: "mcpName is required" },
-        { status: 400 }
-      );
-    }
-
     const subdomain = generateRandomSubdomain();
+    const mcpName = subdomain;
     const ingressHostname = `${subdomain}.ghstmail.me`; // Just the domain without https://
     const ingressUrl = `https://${ingressHostname}`; // Full URL for response
     const tempTargetDir = path.join("/tmp", `target-${uuidv4()}`);
