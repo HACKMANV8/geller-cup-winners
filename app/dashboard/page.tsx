@@ -216,7 +216,7 @@ export default function DashboardPage() {
         <div>
           <div className="p-5 flex items-center gap-3 border-b border-gray-800">
             <Rocket className="h-6 w-6 text-white" />
-            <h1 className="text-lg font-semibold">MCP Deploy</h1>
+            <h1 className="text-lg font-semibold">Plane</h1>
           </div>
           <nav className="mt-6 space-y-1">
             <SidebarItem icon={<Home className="h-4 w-4" />} label="Dashboard" active />
