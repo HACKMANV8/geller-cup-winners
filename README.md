@@ -1,6 +1,6 @@
-# Vercel for Minecraft Plugins
+# Vercel for MCP Servers
 
-A modern deployment platform for Minecraft plugins, built with Next.js 14, Firebase, and GitHub integration. This application allows developers to authenticate with GitHub, import their repositories, and manage deployments with a beautiful, Vercel-inspired UI.
+A modern deployment platform for MCP Servers, built with Next.js 14, Firebase, and GitHub integration. This application allows developers to authenticate with GitHub, import their repositories, and manage deployments with a beautiful, Vercel-inspired UI.
 
 ## 🚀 Features
 
